@@ -5,11 +5,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-# Ensure package roots are on sys.path
+# Ensure package root and subdirectories are on sys.path
 CURRENT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = CURRENT_DIR.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+SUBDIR = PROJECT_ROOT / "spearmint-audit-agent"
+
+for p in (PROJECT_ROOT, SUBDIR):
+    if p.exists() and str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 
 # Safe serverless writable directories (/tmp)
 TMP_DIR = Path(tempfile.gettempdir())
@@ -31,8 +34,7 @@ app = FastAPI(
     version="2.0.0",
 )
 
-# Export handler for Vercel serverless functions
-handler = app
+__all__ = ["app"]
 
 _store: Optional[AuditStore] = None
 
