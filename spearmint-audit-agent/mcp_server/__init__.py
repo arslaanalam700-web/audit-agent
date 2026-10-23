@@ -1,0 +1,1 @@
+"""Spearmint audit MCP server."""

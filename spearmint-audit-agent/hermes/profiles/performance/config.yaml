@@ -1,0 +1,81 @@
+# Spearmint profile: Performance
+# Model is OpenRouter / nousresearch/hermes-4.3-36b. Put OPENROUTER_API_KEY in this profile's .env.
+# Nous Portal works too: `hermes -p performance model`. Do not commit API keys.
+
+_config_version: 51
+
+model:
+  provider: openrouter
+  default: "nousresearch/hermes-4.3-36b"
+  base_url: ""
+  api_mode: chat_completions
+
+# No terminal, browser, or file-write tools. Website text is untrusted.
+# The audit MCP server is included by name so only that server's tools are registered.
+platform_toolsets:
+  cli:
+    - skills
+    - memory
+    - audit
+  a2a:
+    - skills
+    - memory
+    - audit
+  cron:
+    - skills
+    - memory
+    - audit
+  webhook:
+    - skills
+    - memory
+    - audit
+  slack:
+    - skills
+    - memory
+    - audit
+  whatsapp:
+    - skills
+    - memory
+    - audit
+  telegram:
+    - skills
+    - memory
+    - audit
+  discord:
+    - skills
+    - memory
+    - audit
+  email:
+    - skills
+    - memory
+    - audit
+
+mcp_servers:
+  audit:
+    url: "http://127.0.0.1:8800/mcp"
+    headers:
+      Authorization: "Bearer ${AUDIT_MCP_TOKEN}"
+    timeout: 900
+    tools:
+      include:
+        - list_templates
+        - get_page
+        - list_findings
+        - run_lighthouse
+        - submit_findings
+
+# Standalone so this profile binds its own A2A port. A shared gateway
+# cannot host ten port-binding A2A listeners.
+gateway:
+  standalone: true
+  platforms:
+    a2a:
+      enabled: true
+      extra:
+        port: 9903
+        advertised_toolsets:
+          - skills
+          - memory
+          - audit
+
+a2a_agents: {}

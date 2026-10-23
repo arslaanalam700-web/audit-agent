@@ -1,0 +1,26 @@
+[project]
+name = "spearmint-audit-agent"
+version = "2.0.0"
+description = "Multi-agent website and SEO audit engine for Spearmint."
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27",
+  "beautifulsoup4>=4.12",
+  "lxml>=5.0",
+  "jinja2>=3.1",
+  "mcp>=1.9,<2",
+  "uvicorn>=0.30",
+  "sse-starlette>=1.6.1,<2.2",
+  "playwright>=1.40",
+]
+
+[project.scripts]
+spearmint-audit = "engine.site_audit.cli:main"
+spearmint-audit-mcp = "mcp_server.server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["engine*", "mcp_server*"]

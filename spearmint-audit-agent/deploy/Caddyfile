@@ -1,0 +1,4 @@
+# Publishes only the lead auditor. Specialist ports stay on localhost.
+{$AUDIT_DOMAIN:audit.example.com} {
+	reverse_proxy 127.0.0.1:9900
+}

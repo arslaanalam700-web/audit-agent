@@ -1,0 +1,10 @@
+# Monthly re-audit for a retainer client. Create it with:
+#   hermes -p lead cron create --name acme-monthly --schedule "0 9 1 * *" --deliver log
+# The job prompt:
+#   Re-audit https://acme.example for the Acme retainer.
+#   Diff it against the previous audit id stored in memory.
+#   queue_delivery to the Spearmint team. Do not email the client.
+#   If a previously fixed issue is back, say so in the note.
+#
+# Weekly regression is the same job with schedule "0 9 * * 1" and a note to only
+# queue_delivery when the diff contains new critical or high findings.

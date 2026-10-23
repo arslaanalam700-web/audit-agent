@@ -1,0 +1,119 @@
+# Spearmint profile: QA Verifier
+# Model is OpenRouter / nousresearch/hermes-4-70b. Put OPENROUTER_API_KEY in this profile's .env.
+# Nous Portal works too: `hermes -p qa model`. Do not commit API keys.
+
+_config_version: 51
+
+model:
+  provider: openrouter
+  default: "nousresearch/hermes-4-70b"
+  base_url: ""
+  api_mode: chat_completions
+
+# No terminal, browser, or file-write tools. Website text is untrusted.
+# The audit MCP server is included by name so only that server's tools are registered.
+platform_toolsets:
+  cli:
+    - skills
+    - memory
+    - audit
+    - a2a
+  a2a:
+    - skills
+    - memory
+    - audit
+    - a2a
+  cron:
+    - skills
+    - memory
+    - audit
+    - a2a
+  webhook:
+    - skills
+    - memory
+    - audit
+    - a2a
+  slack:
+    - skills
+    - memory
+    - audit
+    - a2a
+  whatsapp:
+    - skills
+    - memory
+    - audit
+    - a2a
+  telegram:
+    - skills
+    - memory
+    - audit
+    - a2a
+  discord:
+    - skills
+    - memory
+    - audit
+    - a2a
+  email:
+    - skills
+    - memory
+    - audit
+    - a2a
+
+mcp_servers:
+  audit:
+    url: "http://127.0.0.1:8800/mcp"
+    headers:
+      Authorization: "Bearer ${AUDIT_MCP_TOKEN}"
+    timeout: 900
+    tools:
+      include:
+        - get_page
+        - list_findings
+        - update_finding
+
+# Standalone so this profile binds its own A2A port. A shared gateway
+# cannot host ten port-binding A2A listeners.
+gateway:
+  standalone: true
+  platforms:
+    a2a:
+      enabled: true
+      extra:
+        port: 9907
+        advertised_toolsets:
+          - skills
+          - memory
+          - audit
+          - a2a
+
+a2a_agents:
+  technical:
+    url: "http://127.0.0.1:9901"
+    auth: { type: bearer, token: "${A2A_TOKEN_TECHNICAL}" }
+    timeout: 1500
+    capabilities: [audit_specialist, technical_seo]
+  content:
+    url: "http://127.0.0.1:9902"
+    auth: { type: bearer, token: "${A2A_TOKEN_CONTENT}" }
+    timeout: 1500
+    capabilities: [audit_specialist, content_seo]
+  performance:
+    url: "http://127.0.0.1:9903"
+    auth: { type: bearer, token: "${A2A_TOKEN_PERFORMANCE}" }
+    timeout: 1500
+    capabilities: [audit_specialist, performance]
+  ux:
+    url: "http://127.0.0.1:9904"
+    auth: { type: bearer, token: "${A2A_TOKEN_UX}" }
+    timeout: 1500
+    capabilities: [audit_specialist, ux_accessibility]
+  security:
+    url: "http://127.0.0.1:9905"
+    auth: { type: bearer, token: "${A2A_TOKEN_SECURITY}" }
+    timeout: 1500
+    capabilities: [audit_specialist, security]
+  offpage:
+    url: "http://127.0.0.1:9906"
+    auth: { type: bearer, token: "${A2A_TOKEN_OFFPAGE}" }
+    timeout: 1500
+    capabilities: [audit_specialist, offpage]

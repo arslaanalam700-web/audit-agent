@@ -1,0 +1,26 @@
+# Reference copy. The lead profile config.yaml already includes this route.
+# The webhook wakes the lead agent. Delivery stays on "log" until a person reviews the outbox.
+
+gateway:
+  platforms:
+    webhook:
+      enabled: true
+      extra:
+        port: 8644
+        routes:
+          audit:
+            secret: ${WEBHOOK_SECRET}
+            deliver: log
+            skills: [website-audit]
+            prompt: |
+              Run a Spearmint website audit.
+              URL: {url}
+              Client: {client_name}
+              Contact email (do not email them): {email}
+              When the report is ready, queue_delivery for internal review. Do not send anything to the client.
+
+# Chat: after `hermes tools` enables the messaging platform, the website-audit skill is also /website-audit.
+# Example: /website-audit https://client.example
+#
+# Public A2A: Caddy publishes only port 9900 (the lead). Set A2A_BEARER_TOKEN and A2A_PUBLIC_URL
+# before changing A2A_HOST away from 127.0.0.1.
