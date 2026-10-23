@@ -92,7 +92,7 @@ def debug():
 @app.post("/audit")
 def run_audit(
     url: str = Query(..., description="Website URL to audit"),
-    max_pages: int = Query(3, ge=1, le=10, description="Pages to crawl (recommended 1-10 on Vercel)"),
+    max_pages: int = Query(1, ge=1, le=5, description="Pages to crawl (recommended 1-3 on Vercel)"),
     client_name: Optional[str] = Query(None, description="Client or brand name"),
 ):
     if _init_error is not None:
@@ -116,9 +116,10 @@ def run_audit(
             audit_id=audit_id,
             store=store,
             max_pages=max_pages,
-            max_depth=3,
-            pagespeed=False,
-            render=False,
+            max_depth=2,
+            timeout=5,            # Short timeout to fit in serverless function
+            pagespeed=False,      # Disabled for speed and quota safety
+            render=False,         # No browser in serverless
             out=str(REPORTS_DIR),
             open_browser=False,
             log=lambda *a, **k: None,
@@ -147,10 +148,7 @@ def list_findings(audit_id: str, limit: int = 50, offset: int = 0):
 
 
 @app.get("/", response_class=HTMLResponse)
-@app.get("/api", response_class=HTMLResponse)
-@app.get("/api/", response_class=HTMLResponse)
-@app.get("/api/index", response_class=HTMLResponse)
-@app.get("/api/index.py", response_class=HTMLResponse)
+@app.get("/index", response_class=HTMLResponse)
 def index():
     if _init_error is not None:
         return f"""<!DOCTYPE html>
@@ -331,9 +329,9 @@ def index():
       <div class="form-group">
         <label for="max_pages">Pages to Crawl</label>
         <select id="max_pages">
-          <option value="1">1 Page (Instant)</option>
-          <option value="3" selected>3 Pages (Fast, ~3s)</option>
-          <option value="5">5 Pages</option>
+          <option value="1" selected>1 Page (Fast, ~1s)</option>
+          <option value="2">2 Pages</option>
+          <option value="3">3 Pages</option>
         </select>
       </div>
       <button id="auditBtn" onclick="runAudit()">Run Audit</button>
@@ -377,9 +375,17 @@ def index():
 
       try {
         const resp = await fetch(`/api/audit?url=${encodeURIComponent(url)}&max_pages=${maxPages}`);
-        const data = await resp.json();
+        const text = await resp.text();
         btn.disabled = false;
         btn.innerText = 'Run Audit';
+
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (jsonErr) {
+          alert('Server returned non-JSON response (HTTP ' + resp.status + '):\\n' + text.slice(0, 300));
+          return;
+        }
 
         if (!resp.ok) {
           alert('Audit failed: ' + (data.detail || JSON.stringify(data)));
