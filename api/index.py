@@ -33,6 +33,7 @@ app = FastAPI(
     title="Spearmint Audit Agent",
     description="Serverless Website & SEO Audit Agent API",
     version="2.0.0",
+    redirect_slashes=False,
 )
 
 __all__ = ["app"]
@@ -71,6 +72,7 @@ def health():
 
 
 @app.get("/debug")
+@app.get("/api/debug")
 def debug():
     return {
         "init_error": _init_error,
@@ -86,6 +88,8 @@ def debug():
 
 @app.get("/api/audit")
 @app.post("/api/audit")
+@app.get("/audit")
+@app.post("/audit")
 def run_audit(
     url: str = Query(..., description="Website URL to audit"),
     max_pages: int = Query(3, ge=1, le=10, description="Pages to crawl (recommended 1-10 on Vercel)"),
@@ -134,6 +138,7 @@ def run_audit(
 
 
 @app.get("/api/findings")
+@app.get("/findings")
 def list_findings(audit_id: str, limit: int = 50, offset: int = 0):
     store = get_store()
     if store is None:
@@ -142,6 +147,10 @@ def list_findings(audit_id: str, limit: int = 50, offset: int = 0):
 
 
 @app.get("/", response_class=HTMLResponse)
+@app.get("/api", response_class=HTMLResponse)
+@app.get("/api/", response_class=HTMLResponse)
+@app.get("/api/index", response_class=HTMLResponse)
+@app.get("/api/index.py", response_class=HTMLResponse)
 def index():
     if _init_error is not None:
         return f"""<!DOCTYPE html>
