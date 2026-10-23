@@ -1,11 +1,12 @@
 import os
 import sys
 import tempfile
+import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-# Ensure package root and subdirectories are on sys.path
+# Setup directories and sys.path
 CURRENT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = CURRENT_DIR.parent
 SUBDIR = PROJECT_ROOT / "spearmint-audit-agent"
@@ -18,15 +19,15 @@ for p in (PROJECT_ROOT, SUBDIR):
 TMP_DIR = Path(tempfile.gettempdir())
 AUDIT_DB_PATH = TMP_DIR / "audits.db"
 REPORTS_DIR = TMP_DIR / "reports"
-REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 
-# Set DB environment variable so engine components pick it up
 os.environ["AUDIT_DB"] = str(AUDIT_DB_PATH)
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
-from engine.pipeline import execute
-from engine.store import AuditStore
 
 app = FastAPI(
     title="Spearmint Audit Agent",
@@ -36,12 +37,23 @@ app = FastAPI(
 
 __all__ = ["app"]
 
-_store: Optional[AuditStore] = None
+# Safely import engine modules
+_init_error: Optional[str] = None
+execute = None
+AuditStore = None
+
+try:
+    from engine.pipeline import execute
+    from engine.store import AuditStore
+except Exception:
+    _init_error = traceback.format_exc()
+
+_store = None
 
 
-def get_store() -> AuditStore:
+def get_store():
     global _store
-    if _store is None:
+    if _store is None and AuditStore is not None:
         _store = AuditStore(AUDIT_DB_PATH)
     return _store
 
@@ -50,10 +62,25 @@ def get_store() -> AuditStore:
 @app.get("/api/health")
 def health():
     return {
-        "status": "ok",
+        "status": "ok" if _init_error is None else "degraded",
         "platform": "vercel",
         "service": "spearmint-audit-agent",
+        "engine_ready": _init_error is None,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/debug")
+def debug():
+    return {
+        "init_error": _init_error,
+        "python_version": sys.version,
+        "cwd": os.getcwd(),
+        "files_in_cwd": os.listdir(".") if os.path.exists(".") else [],
+        "sys_path": sys.path,
+        "audit_db": str(AUDIT_DB_PATH),
+        "reports_dir": str(REPORTS_DIR),
+        "engine_imported": execute is not None,
     }
 
 
@@ -64,6 +91,9 @@ def run_audit(
     max_pages: int = Query(3, ge=1, le=10, description="Pages to crawl (recommended 1-10 on Vercel)"),
     client_name: Optional[str] = Query(None, description="Client or brand name"),
 ):
+    if _init_error is not None:
+        raise HTTPException(status_code=500, detail=f"Engine initialization error: {_init_error}")
+
     clean_url = url.strip()
     if not clean_url.startswith(("http://", "https://")):
         clean_url = "https://" + clean_url
@@ -77,15 +107,14 @@ def run_audit(
     store = get_store()
 
     try:
-        # Run deterministic crawl and audit within serverless execution bounds
         result = execute(
             clean_url,
             audit_id=audit_id,
             store=store,
             max_pages=max_pages,
             max_depth=3,
-            pagespeed=False,      # Disabled to avoid external rate-limits and timeouts
-            render=False,         # Headless browser disabled on serverless
+            pagespeed=False,
+            render=False,
             out=str(REPORTS_DIR),
             open_browser=False,
             log=lambda *a, **k: None,
@@ -107,11 +136,25 @@ def run_audit(
 @app.get("/api/findings")
 def list_findings(audit_id: str, limit: int = 50, offset: int = 0):
     store = get_store()
+    if store is None:
+        raise HTTPException(status_code=500, detail="Store is not initialized")
     return store.list_findings(audit_id, limit=limit, offset=offset)
 
 
 @app.get("/", response_class=HTMLResponse)
 def index():
+    if _init_error is not None:
+        return f"""<!DOCTYPE html>
+<html>
+<head><title>Initialization Error - Spearmint</title></head>
+<body style="font-family:sans-serif;background:#0f172a;color:#f8fafc;padding:30px;">
+  <h2 style="color:#ef4444;">Engine Startup Error</h2>
+  <p>The Python serverless function started, but failed to load the engine:</p>
+  <pre style="background:#1e293b;padding:16px;border-radius:8px;overflow:auto;color:#fca5a5;">{_init_error}</pre>
+  <p><a href="/debug" style="color:#12a37f;">View Debug Environment (/debug)</a></p>
+</body>
+</html>"""
+
     return """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -302,6 +345,7 @@ def index():
     <div class="links">
       <a href="/docs" target="_blank">Interactive API Docs (/docs)</a>
       <a href="/api/health" target="_blank">Health Check (/api/health)</a>
+      <a href="/debug" target="_blank">Debug (/debug)</a>
     </div>
   </div>
 

@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Website Audit - {{ client_name }} | {{ agency }}</title>
+<style>
+  :root { --brand: {{ brand_color }}; --ink: #0f172a; --muted: #64748b; --line: #e2e8f0; --bg: #f8fafc;
+          --critical: #b91c1c; --high: #ea580c; --medium: #d97706; --low: #2563eb; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Inter, system-ui, -apple-system, sans-serif; color: var(--ink);
+         background: var(--bg); line-height: 1.55; font-size: 15px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+  header.cover { background: linear-gradient(135deg, var(--brand), #0f172a); color: #fff; padding: 56px 0 64px; }
+  .cover .agency { font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 13px; opacity: .85; }
+  .cover h1 { font-size: 40px; margin: 18px 0 6px; line-height: 1.15; }
+  .cover .sub { opacity: .85; font-size: 16px; }
+  .cover .meta { margin-top: 28px; display: flex; gap: 28px; flex-wrap: wrap; font-size: 14px; opacity: .9; }
+  section { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 30px 32px; margin: 26px 0; }
+  section > h2 { margin: 0 0 18px; font-size: 22px; }
+  h3 { font-size: 17px; margin: 0 0 6px; }
+  .muted { color: var(--muted); }
+  .score-hero { display: grid; grid-template-columns: 220px 1fr; gap: 36px; align-items: center; margin-top: -60px; }
+  .gauge { position: relative; width: 200px; height: 200px; background: #fff; border-radius: 50%;
+           box-shadow: 0 10px 30px rgba(15,23,42,.15); }
+  .gauge svg { transform: rotate(-90deg); }
+  .gauge .val { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .gauge .num { font-size: 52px; font-weight: 800; line-height: 1; }
+  .gauge .grade { font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .cat { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .cat .name { font-size: 13px; color: var(--muted); }
+  .cat .s { font-size: 24px; font-weight: 700; }
+  .bar { height: 6px; background: #eef2f7; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .bar > i { display: block; height: 100%; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .stat { background: var(--bg); border-radius: 10px; padding: 14px 16px; }
+  .stat .n { font-size: 26px; font-weight: 800; }
+  .stat .l { font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .sev { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+         text-transform: uppercase; letter-spacing: .04em; color: #fff; white-space: nowrap; }
+  .sev.critical { background: var(--critical); } .sev.high { background: var(--high); }
+  .sev.medium { background: var(--medium); } .sev.low { background: var(--low); }
+  .n.critical { color: var(--critical); } .n.high { color: var(--high); } .n.medium { color: var(--medium); } .n.low { color: var(--low); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); font-size: 12px; }
+  .summary p { margin: 0 0 12px; font-size: 16px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+  ul.clean { padding-left: 18px; margin: 6px 0; } ul.clean li { margin: 4px 0; }
+  .issue { border: 1px solid var(--line); border-left: 5px solid var(--low); border-radius: 10px; padding: 16px 18px; margin: 12px 0; break-inside: avoid; }
+  .issue.critical { border-left-color: var(--critical); } .issue.high { border-left-color: var(--high); }
+  .issue.medium { border-left-color: var(--medium); }
+  .issue .head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .issue .count { margin-left: auto; font-weight: 700; color: var(--muted); font-size: 13px; }
+  .issue .why, .issue .fix { margin: 8px 0 0; font-size: 14px; }
+  .issue .fix b { color: var(--brand); }
+  details { margin-top: 10px; } summary { cursor: pointer; color: var(--brand); font-weight: 600; font-size: 13.5px; }
+  .urls { font-size: 12.5px; margin-top: 8px; max-height: 340px; overflow: auto; }
+  .urls td { padding: 5px 8px; word-break: break-all; }
+  .cat-title { margin: 28px 0 4px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+  .psi-scores { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; }
+  .psi { text-align: center; width: 110px; }
+  .psi .ring { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 6px; display: flex; align-items: center;
+               justify-content: center; font-size: 24px; font-weight: 800; border: 6px solid; }
+  .good { color: #16a34a; } .avg { color: #d97706; } .poor { color: #dc2626; }
+  .cta { background: linear-gradient(135deg, var(--brand), #0f172a); color: #fff; border: 0; }
+  .cta h2 { color: #fff; }
+  footer { text-align: center; color: var(--muted); font-size: 12.5px; padding: 20px 0 40px; }
+  @media (max-width: 760px) { .score-hero, .two { grid-template-columns: 1fr; } .cover h1 { font-size: 30px; } }
+  @media print {
+    body { background: #fff; font-size: 12.5px; }
+    section { border: 0; padding: 12px 0; margin: 12px 0; }
+    header.cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .sev, .bar > i, .cta, .stat { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .urls { max-height: none; overflow: visible; }
+    .page-break { break-before: page; }
+    .no-print { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="cover">
+  <div class="wrap">
+    <div class="agency">{{ agency }} &middot; Website Audit</div>
+    <h1>SEO &amp; Website Health Report</h1>
+    <div class="sub">{{ client_name }} &mdash; <a href="{{ start_url }}" style="color:#fff">{{ domain }}</a></div>
+    <div class="meta">
+      <div><b>Date:</b> {{ generated_human }}</div>
+      <div><b>Pages analysed:</b> {{ stats.html_pages }}</div>
+      <div><b>Checks run:</b> {{ stats.checks_run }}+</div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="score-hero">
+    {% set c = score.overall|score_color %}
+    <div class="gauge">
+      <svg width="200" height="200" viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="86" fill="none" stroke="#eef2f7" stroke-width="16"/>
+        <circle cx="100" cy="100" r="86" fill="none" stroke="{{ c }}" stroke-width="16" stroke-linecap="round"
+                stroke-dasharray="{{ (540.35 * score.overall / 100)|round(1) }} 540.35"/>
+      </svg>
+      <div class="val"><div class="num" style="color:{{ c }}">{{ score.overall }}</div><div class="grade">Overall &middot; Grade {{ score.grade }}</div></div>
+    </div>
+    <div style="padding-top:70px">
+      <div class="cats">
+        {% for cat in score.categories %}
+        <div class="cat">
+          <div class="name">{{ cat.name }}</div>
+          <div class="s" style="color:{{ cat.score|score_color }}">{{ cat.score }}<span class="muted" style="font-size:14px">/100</span></div>
+          <div class="bar"><i style="width:{{ cat.score }}%;background:{{ cat.score|score_color }}"></i></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <h2>At a glance</h2>
+    <div class="stats">
+      <div class="stat"><div class="n">{{ stats.html_pages }}</div><div class="l">Pages crawled</div></div>
+      <div class="stat"><div class="n critical">{{ stats.by_severity.critical }}</div><div class="l">Critical issues</div></div>
+      <div class="stat"><div class="n high">{{ stats.by_severity.high }}</div><div class="l">High priority</div></div>
+      <div class="stat"><div class="n medium">{{ stats.by_severity.medium }}</div><div class="l">Medium priority</div></div>
+      <div class="stat"><div class="n low">{{ stats.by_severity.low }}</div><div class="l">Low priority</div></div>
+      <div class="stat"><div class="n">{{ stats.avg_response_ms }}<span style="font-size:14px"> ms</span></div><div class="l">Avg. response</div></div>
+    </div>
+  </section>
+
+  <section class="summary">
+    <h2>Executive summary</h2>
+    {% for para in summary.executive_summary.split('\n\n') %}<p>{{ para }}</p>{% endfor %}
+    <div class="two" style="margin-top:18px">
+      <div>
+        <h3>Top priorities</h3>
+        <table>
+          <tr><th>#</th><th>Action</th><th>Impact</th><th>Effort</th></tr>
+          {% for p in summary.top_priorities %}
+          <tr><td>{{ loop.index }}</td><td>{{ p.title }}</td><td><span class="pill">{{ p.impact }}</span></td><td><span class="pill">{{ p.effort }}</span></td></tr>
+          {% endfor %}
+        </table>
+      </div>
+      <div>
+        <h3>Quick wins (under a week)</h3>
+        {% if summary.quick_wins %}
+        <ul class="clean">{% for q in summary.quick_wins %}<li>{{ q }}</li>{% endfor %}</ul>
+        {% else %}<p class="muted">No quick wins identified - the remaining work is structural.</p>{% endif %}
+      </div>
+    </div>
+  </section>
+
+  {% if psi %}
+  <section>
+    <h2>Speed &amp; Core Web Vitals <span class="muted" style="font-size:14px;font-weight:400">(Google PageSpeed Insights, {{ psi.strategy }})</span></h2>
+    <div class="psi-scores">
+      {% for name, val in psi.scores.items() %}
+      {% set cls = 'good' if val >= 90 else ('avg' if val >= 50 else 'poor') %}
+      <div class="psi"><div class="ring {{ cls }}">{{ val }}</div><div class="muted" style="font-size:13px">{{ name|replace('-', ' ')|title }}</div></div>
+      {% endfor %}
+    </div>
+    <div class="two">
+      <div>
+        <h3>Real-user experience (Chrome UX Report)</h3>
+        {% if psi.field %}
+        <table>
+          <tr><th>Metric</th><th>75th percentile</th><th>Rating</th></tr>
+          {% for k, v in psi.field.items() %}
+          {% set cls = 'good' if v.category == 'FAST' else ('avg' if v.category == 'AVERAGE' else 'poor') %}
+          <tr><td>{{ k }}</td><td>{{ v.value }}{{ v.unit }}</td><td class="{{ cls }}"><b>{{ {'FAST':'Good','AVERAGE':'Needs improvement','SLOW':'Poor'}.get(v.category, v.category) }}</b></td></tr>
+          {% endfor %}
+        </table>
+        {% else %}<p class="muted">Not enough real-user traffic data for this site in Google's dataset.</p>{% endif %}
+        <h3 style="margin-top:16px">Lab metrics</h3>
+        <table>{% for k, v in psi.lab.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
+      </div>
+      <div>
+        <h3>Biggest speed opportunities</h3>
+        {% if psi.opportunities %}
+        <table>
+          <tr><th>Opportunity</th><th>Est. saving</th></tr>
+          {% for o in psi.opportunities %}<tr><td>{{ o.title }}</td><td>{{ o.display or (o.savings_ms ~ ' ms') }}</td></tr>{% endfor %}
+        </table>
+        {% else %}<p class="muted">No significant opportunities reported.</p>{% endif %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="page-break">
+    <h2>Detailed findings</h2>
+    <p class="muted">Issues are grouped by area and ordered by priority. Each one explains why it matters for the business and how to fix it.</p>
+    {% for cat in score.categories %}
+      {% set cat_issues = issues | selectattr('category', 'equalto', cat.name) | list %}
+      <div class="cat-title">{{ cat.name }} <span class="pill" style="color:{{ cat.score|score_color }}">{{ cat.score }}/100</span></div>
+      {% if not cat_issues %}<p class="good" style="margin:6px 0 0">&#10003; No issues found in this area.</p>{% endif %}
+      {% for i in cat_issues %}
+      <div class="issue {{ i.severity }}">
+        <div class="head">
+          <span class="sev {{ i.severity }}">{{ i.severity }}</span>
+          <h3 style="margin:0">{{ i.title }}</h3>
+          <span class="count">{% if i.scope == 'site' %}Site-wide{% else %}{{ i.count }} page{{ 's' if i.count != 1 }}{% if stats.html_pages %} ({{ (100 * i.count / stats.html_pages)|round|int }}%){% endif %}{% endif %}</span>
+        </div>
+        <p class="why">{{ i.why }}</p>
+        <p class="fix"><b>Fix:</b> {{ i.fix }}</p>
+        {% if i.affected and (i.affected|length > 1 or i.affected[0].detail) %}
+        <details>
+          <summary>Show affected {{ 'URLs' if i.scope == 'page' else 'details' }}{% if i.affected|length > max_urls %} (first {{ max_urls }} of {{ i.affected|length }} - full list in issues.csv){% endif %}</summary>
+          <table class="urls">
+            {% for a in i.affected[:max_urls] %}<tr><td style="width:45%">{{ a.url }}</td><td class="muted">{{ a.detail }}</td></tr>{% endfor %}
+          </table>
+        </details>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% endfor %}
+  </section>
+
+  <section class="page-break">
+    <h2>Fix plan</h2>
+    {% if estimate %}
+    <p>Estimated delivery: <b>{{ estimate.hours }} hours</b> at ₹{{ '{:,}'.format(estimate.rate_inr) }}/hour
+    = <b>₹{{ '{:,}'.format(estimate.total_inr) }}</b> across {{ estimate.tickets }} tickets. This is a starting quote for the Spearmint team, before scope review.</p>
+    {% endif %}
+    {% if tickets %}
+    <table>
+      <tr><th>Owner</th><th>Hours</th><th>Ticket</th><th>Done when</th></tr>
+      {% for t in tickets[:40] %}
+      <tr><td>{{ t.owner }}</td><td>{{ t.effort_hours }}</td><td>{{ t.title }}</td><td class="muted">{{ t.acceptance }}</td></tr>
+      {% endfor %}
+    </table>
+    {% if tickets|length > 40 %}<p class="muted">{{ tickets|length - 40 }} more tickets are in the fix pack.</p>{% endif %}
+    {% else %}<p class="muted">No fix tickets were raised.</p>{% endif %}
+  </section>
+
+  <section class="page-break">
+    <h2>Crawl overview</h2>
+    <div class="two">
+      <div>
+        <h3>Response codes</h3>
+        <table>{% for code, n in stats.status_codes.items() %}<tr><td>{{ code }}</td><td>{{ n }}</td></tr>{% endfor %}</table>
+      </div>
+      <div>
+        <h3>Indexing setup</h3>
+        <table>
+          <tr><td>HTTPS</td><td>{{ 'Yes' if site.https else 'No' }}</td></tr>
+          <tr><td>robots.txt</td><td>{{ 'Found' if robots.exists else 'Missing' }}</td></tr>
+          <tr><td>XML sitemap</td><td>{% if sitemap.found %}Found ({{ sitemap.urls|length }} URLs){% else %}Missing{% endif %}</td></tr>
+          <tr><td>Structured data types</td><td>{{ stats.schema_types|join(', ') or 'None' }}</td></tr>
+          <tr><td>Indexable pages</td><td>{{ stats.indexable }}</td></tr>
+          <tr><td>Avg. words per page</td><td>{{ stats.avg_words }}</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  {% if summary.pitch_points %}
+  <section class="cta">
+    <h2>How {{ agency }} can help</h2>
+    <ul class="clean" style="font-size:16px">{% for p in summary.pitch_points %}<li>{{ p }}</li>{% endfor %}</ul>
+    <p style="margin-top:16px;opacity:.9">{{ contact or ('Contact ' ~ agency ~ ' to turn this audit into a prioritised 90-day growth plan.') }}</p>
+  </section>
+  {% endif %}
+
+  <footer>Report generated by {{ agency }} on {{ generated_human }}. Crawl of {{ stats.html_pages }} pages took {{ duration_s }}s.
+    Data reflects the site at the time of the audit.</footer>
+</div>
+<script>
+  window.addEventListener('beforeprint', () => document.querySelectorAll('details').forEach(d => d.open = true));
+</script>
+</body>
+</html>
