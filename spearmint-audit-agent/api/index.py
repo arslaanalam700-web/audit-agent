@@ -107,8 +107,8 @@ def _execute_audit(url: str, max_pages: int = 5, client_name: Optional[str] = No
             "findings": findings,
             "report_dir": result.get("report_dir"),
         }
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Audit failed: {str(exc)[:400]}")
+    except (Exception, SystemExit) as exc:
+        raise HTTPException(status_code=400, detail=f"Audit failed: {str(exc)[:400]}")
 
 
 @app.get("/health")
