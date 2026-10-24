@@ -26,7 +26,7 @@ except Exception:
 
 os.environ["AUDIT_DB"] = str(AUDIT_DB_PATH)
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 app = FastAPI(
@@ -59,6 +59,50 @@ def get_store():
     return _store
 
 
+def _execute_audit(url: str, max_pages: int = 1, client_name: Optional[str] = None) -> dict:
+    if _init_error is not None:
+        raise HTTPException(status_code=500, detail=f"Engine initialization error: {_init_error}")
+
+    clean_url = url.strip()
+    if not clean_url.startswith(("http://", "https://")):
+        clean_url = "https://" + clean_url
+
+    try:
+        host = clean_url.split("/")[2].replace(".", "-").replace(":", "-")
+    except Exception:
+        host = "site"
+
+    audit_id = f"{host}-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}"
+    store = get_store()
+
+    try:
+        result = execute(
+            clean_url,
+            audit_id=audit_id,
+            store=store,
+            max_pages=min(max(1, max_pages), 5),
+            max_depth=2,
+            timeout=5,
+            pagespeed=False,
+            render=False,
+            out=str(REPORTS_DIR),
+            open_browser=False,
+            log=lambda *a, **k: None,
+            client_name=client_name,
+        )
+
+        return {
+            "status": "completed",
+            "audit_id": audit_id,
+            "url": clean_url,
+            "score": result.get("score"),
+            "stats": result.get("stats"),
+            "estimate": result.get("estimate"),
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Audit failed: {str(exc)[:400]}")
+
+
 @app.get("/health")
 @app.get("/api/health")
 def health():
@@ -86,58 +130,6 @@ def debug():
     }
 
 
-@app.get("/api/audit")
-@app.post("/api/audit")
-@app.get("/audit")
-@app.post("/audit")
-def run_audit(
-    url: str = Query(..., description="Website URL to audit"),
-    max_pages: int = Query(1, ge=1, le=5, description="Pages to crawl (recommended 1-3 on Vercel)"),
-    client_name: Optional[str] = Query(None, description="Client or brand name"),
-):
-    if _init_error is not None:
-        raise HTTPException(status_code=500, detail=f"Engine initialization error: {_init_error}")
-
-    clean_url = url.strip()
-    if not clean_url.startswith(("http://", "https://")):
-        clean_url = "https://" + clean_url
-
-    try:
-        host = clean_url.split("/")[2].replace(".", "-").replace(":", "-")
-    except Exception:
-        host = "site"
-
-    audit_id = f"{host}-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}"
-    store = get_store()
-
-    try:
-        result = execute(
-            clean_url,
-            audit_id=audit_id,
-            store=store,
-            max_pages=max_pages,
-            max_depth=2,
-            timeout=5,            # Short timeout to fit in serverless function
-            pagespeed=False,      # Disabled for speed and quota safety
-            render=False,         # No browser in serverless
-            out=str(REPORTS_DIR),
-            open_browser=False,
-            log=lambda *a, **k: None,
-            client_name=client_name,
-        )
-
-        return {
-            "status": "completed",
-            "audit_id": audit_id,
-            "url": clean_url,
-            "score": result.get("score"),
-            "stats": result.get("stats"),
-            "estimate": result.get("estimate"),
-        }
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Audit failed: {str(exc)[:400]}")
-
-
 @app.get("/api/findings")
 @app.get("/findings")
 def list_findings(audit_id: str, limit: int = 50, offset: int = 0):
@@ -147,22 +139,7 @@ def list_findings(audit_id: str, limit: int = 50, offset: int = 0):
     return store.list_findings(audit_id, limit=limit, offset=offset)
 
 
-@app.get("/", response_class=HTMLResponse)
-@app.get("/index", response_class=HTMLResponse)
-def index():
-    if _init_error is not None:
-        return f"""<!DOCTYPE html>
-<html>
-<head><title>Initialization Error - Spearmint</title></head>
-<body style="font-family:sans-serif;background:#0f172a;color:#f8fafc;padding:30px;">
-  <h2 style="color:#ef4444;">Engine Startup Error</h2>
-  <p>The Python serverless function started, but failed to load the engine:</p>
-  <pre style="background:#1e293b;padding:16px;border-radius:8px;overflow:auto;color:#fca5a5;">{_init_error}</pre>
-  <p><a href="/debug" style="color:#12a37f;">View Debug Environment (/debug)</a></p>
-</body>
-</html>"""
-
-    return """<!DOCTYPE html>
+DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -374,7 +351,7 @@ def index():
       resultDiv.style.display = 'none';
 
       try {
-        const resp = await fetch(`/api/audit?url=${encodeURIComponent(url)}&max_pages=${maxPages}`);
+        const resp = await fetch(`/?url=${encodeURIComponent(url)}&max_pages=${maxPages}`);
         const text = await resp.text();
         btn.disabled = false;
         btn.innerText = 'Run Audit';
@@ -383,7 +360,7 @@ def index():
         try {
           data = JSON.parse(text);
         } catch (jsonErr) {
-          alert('Server returned non-JSON response (HTTP ' + resp.status + '):\\n' + text.slice(0, 300));
+          alert('Server returned: ' + text.slice(0, 300));
           return;
         }
 
@@ -415,3 +392,31 @@ def index():
 </body>
 </html>
 """
+
+
+# Catch-all adaptive route: handles root, /api/audit, and any rewritten path seamlessly
+@app.api_route("/{full_path:path}", methods=["GET", "POST"])
+def adaptive_handler(request: Request, full_path: str = ""):
+    qp = request.query_params
+    
+    # Check if this is an audit request (has ?url= or target path)
+    if "url" in qp:
+        try:
+            pages = int(qp.get("max_pages", 1))
+        except Exception:
+            pages = 1
+        return _execute_audit(qp["url"], max_pages=pages, client_name=qp.get("client_name"))
+
+    if full_path in ("health", "api/health"):
+        return health()
+
+    if full_path in ("debug", "api/debug"):
+        return debug()
+
+    if _init_error is not None:
+        return HTMLResponse(
+            f"<h2>Engine Startup Error</h2><pre>{_init_error}</pre>",
+            status_code=500
+        )
+
+    return HTMLResponse(DASHBOARD_HTML)
